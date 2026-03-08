@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Theme-Sync Text Formatter</title>
+    <style>
+        /* Base / Light Mode Variables */
+        :root {
+            --bg-color: #f0f2f5;
+            --container-bg: #ffffff;
+            --text-color: #333333;
+            --input-bg: #ffffff;
+            --border-color: #cccccc;
+            --accent-color: #6200ee;
+            --button-bg: #f8f9fa;
+            --button-hover: #e2e6ea;
+            --success-color: #00897b;
+            --utility-color: #f57c00;
+            --danger-color: #d32f2f;
+            --info-color: #1976d2;
+            --modal-bg: rgba(0, 0, 0, 0.4);
+        }
+
+        /* Dark Mode Variables */
+        [data-theme="dark"] {
+            --bg-color: #121212;
+            --container-bg: #1e1e1e;
+            --text-color: #e0e0e0;
+            --input-bg: #2d2d2d;
+            --border-color: #444;
+            --accent-color: #bb86fc;
+            --button-bg: #332940;
+            --button-hover: #4a3b5c;
+            --success-color: #03dac6;
+            --utility-color: #ffb74d;
+            --danger-color: #ff5252;
+            --info-color: #64b5f6;
+            --modal-bg: rgba(0, 0, 0, 0.7);
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            padding: 40px 20px;
+            margin: 0;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .container {
+            background-color: var(--container-bg);
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 925px;
+            transition: background-color 0.3s ease;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: var(--accent-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        button.header-btn {
+            background-color: transparent;
+            font-size: 0.85em;
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        button.header-btn:hover {
+            background-color: var(--button-hover);
+            border-color: var(--accent-color);
+        }
+
+        button.undo-btn { color: var(--info-color); border-color: var(--info-color); }
+        button.undo-btn:hover { background-color: rgba(100, 181, 246, 0.1); border-color: var(--info-color); }
+
+        button.clear-btn { color: var(--danger-color); border-color: var(--danger-color); }
+        button.clear-btn:hover { background-color: rgba(255, 82, 82, 0.1); border-color: var(--danger-color); }
+
+        button.copy-btn { color: var(--success-color); border-color: var(--success-color); }
+        button.copy-btn:hover { background-color: rgba(3, 218, 198, 0.1); border-color: var(--success-color); }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            font-size: 0.9em;
+            color: var(--text-color);
+            opacity: 0.8;
+        }
+
+        .textarea-wrapper {
+            position: relative;
+            width: 100%;
+        }
+
+        /* Shared base styles for inputs */
+        textarea, input[type="text"], select {
+            width: 100%;
+            box-sizing: border-box;
+            background-color: var(--input-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 12px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 14px;
+            display: block;
+            transition: background-color 0.3s ease, border-color 0.2s ease, color 0.3s ease;
+        }
+
+        textarea {
+            padding-bottom: 30px; 
+            resize: vertical;
+        }
+
+        textarea:focus, input[type="text"]:focus, select:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .counter-display {
+            position: absolute;
+            bottom: 10px;
+            right: 15px;
+            font-size: 0.8em;
+            color: #888;
+            background-color: transparent;
+            pointer-events: none; 
+            user-select: none;
+        }
+
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .utility-row {
+            display: flex;
+            flex-wrap: nowrap; /* Forces everything on one line */
+            gap: 10px;
+            align-items: center;
+        }
+
+        /* THE FIX: Decouple from width: 100% so they fit inline */
+        .utility-row input[type="text"] {
+            width: auto; 
+            flex-grow: 1; 
+            min-width: 80px; /* Small enough to not break the line, flex-grow handles the rest */
+            padding: 10px;
+        }
+
+        button.action-btn {
+            background-color: var(--button-bg);
+            color: var(--accent-color);
+            border: 1px solid var(--accent-color);
+            padding: 10px 18px;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        button.action-btn:hover {
+            background-color: var(--button-hover);
+        }
+        
+        button.special-btn {
+            background-color: var(--accent-color);
+            color: var(--container-bg);
+        }
+
+        button.special-btn:hover {
+            opacity: 0.9;
+        }
+
+        button.utility-btn {
+            border-color: var(--utility-color);
+            color: var(--utility-color);
+            background-color: transparent;
+        }
+
+        button.utility-btn:hover {
+            background-color: rgba(255, 183, 77, 0.1);
+        }
+        
+        .note {
+            font-size: 0.85em;
+            color: #888;
+            margin-top: 5px;
+        }
+        
+        hr {
+            border: 0;
+            height: 1px;
+            background: var(--border-color);
+            margin: 20px 0;
+        }
+
+        /* Modal Styles */
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--modal-bg);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background-color: var(--container-bg);
+            padding: 30px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border-color);
+        }
+
+        .modal-content h3 {
+            margin-top: 0;
+            color: var(--accent-color);
+            margin-bottom: 20px;
+        }
+
+        .settings-group {
+            margin-bottom: 15px;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: var(--accent-color);
+        }
+
+        .checkbox-group label {
+            margin-bottom: 0;
+            cursor: pointer;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="settingsModal" class="modal-backdrop" onclick="handleBackdropClick(event)">
+        <div class="modal-content">
+            <h3>Settings</h3>
+            
+            <div class="settings-group">
+                <label for="dictConfig">Acronym Dictionary (Comma-separated)</label>
+                <input type="text" id="dictConfig">
+            </div>
+
+            <div class="settings-group">
+                <label for="themeSelect">Theme Preference</label>
+                <select id="themeSelect" onchange="applyTheme()">
+                    <option value="system">System Default</option>
+                    <option value="light">Light Mode</option>
+                    <option value="dark">Dark Mode</option>
+                </select>
+            </div>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="autoTrimConfig">
+                <label for="autoTrimConfig">Enable automatic space trimming on conversion</label>
+            </div>
+            
+            <div style="text-align: right; margin-top: 25px;">
+                <button class="action-btn" onclick="closeAndSaveSettings()">Save & Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>
+            Text Formatter
+            <div class="header-buttons">
+                <button class="header-btn" onclick="openSettings()">Settings</button>
+                <button class="header-btn undo-btn" onclick="undoAction()">Undo</button>
+                <button class="header-btn clear-btn" onclick="clearText()">Clear</button>
+                <button class="header-btn copy-btn" onclick="copyText()" id="copyBtn">Copy</button>
+            </div>
+        </h2>
+
+        <div class="form-group">
+            <div class="textarea-wrapper">
+                <textarea id="mainText" rows="15" placeholder="Paste your text here..." autofocus></textarea>
+                <div id="textCounter" class="counter-display">0/0</div>
+            </div>
+            <div class="note">* Note: Automatic space trimming is active by default. Can be disabled in Settings.</div>
+        </div>
+
+        <div class="button-group">
+            <button class="action-btn" onclick="processText('sentence')">Sentence case</button>
+            <button class="action-btn" onclick="processText('uppercase')">UPPERCASE</button>
+            <button class="action-btn" onclick="processText('lowercase')">lowercase</button>
+            <button class="action-btn" onclick="processText('capitalized')">Capitalized Case</button>
+            <button class="action-btn" onclick="processText('alternate')">aLtErNaTe CaSe</button>
+            <button class="action-btn" onclick="processText('invert')">iNVERT cASE</button>
+            <button class="action-btn special-btn" title="Uses Dictionary" onclick="processText('title')">Title Case</button>
+        </div>
+        
+        <hr>
+        
+        <div class="utility-row">
+            <button class="action-btn utility-btn" onclick="processText('trim')">Trim Spaces</button>
+            <button class="action-btn utility-btn" onclick="processText('accents')">Remove Accents</button>
+            <button class="action-btn utility-btn" onclick="executeReplace()">Replace Text</button>
+            <input type="text" id="findInput" placeholder="Find...">
+            <input type="text" id="replaceInput" placeholder="Replace with...">
+        </div>
+    </div>
+
+    <script>
+        // --- STATE & CONFIG ---
+        let historyState = "";
+        
+        let appConfig = {
+            dictionary: "LTDA, EIRELI, EPP, MEI, SA, S.A., LoL",
+            theme: "system",
+            autoTrim: true
+        };
+
+        // --- INITIALIZATION ---
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedConfig = localStorage.getItem('formatterConfig');
+            const oldDict = localStorage.getItem('myAcronymDict'); 
+            
+            if (savedConfig) {
+                appConfig = { ...appConfig, ...JSON.parse(savedConfig) };
+            } else if (oldDict) {
+                appConfig.dictionary = oldDict; 
+                localStorage.removeItem('myAcronymDict'); 
+            }
+
+            document.getElementById('dictConfig').value = appConfig.dictionary;
+            document.getElementById('themeSelect').value = appConfig.theme;
+            document.getElementById('autoTrimConfig').checked = appConfig.autoTrim;
+
+            applyTheme(); 
+            
+            document.getElementById('mainText').addEventListener('input', updateCounter);
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+                if(appConfig.theme === 'system') applyTheme();
+            });
+        });
+
+        // --- THEME ENGINE ---
+        function applyTheme() {
+            const selectedTheme = document.getElementById('themeSelect').value;
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            
+            if (selectedTheme === 'dark' || (selectedTheme === 'system' && prefersDark)) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            } else {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        }
+
+        // --- SETTINGS MODAL LOGIC ---
+        function openSettings() {
+            document.getElementById('settingsModal').style.display = 'flex';
+        }
+
+        function closeAndSaveSettings() {
+            document.getElementById('settingsModal').style.display = 'none';
+            
+            appConfig.dictionary = document.getElementById('dictConfig').value;
+            appConfig.theme = document.getElementById('themeSelect').value;
+            appConfig.autoTrim = document.getElementById('autoTrimConfig').checked;
+            
+            localStorage.setItem('formatterConfig', JSON.stringify(appConfig));
+            applyTheme(); 
+            
+            document.getElementById('mainText').focus(); 
+        }
+
+        function handleBackdropClick(event) {
+            if (event.target.id === 'settingsModal') {
+                closeAndSaveSettings();
+            }
+        }
+
+        // --- CORE UI LOGIC ---
+        function updateCounter() {
+            const text = document.getElementById('mainText').value;
+            const charCount = text.length;
+            const wordCount = text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
+            document.getElementById('textCounter').innerText = `${wordCount}/${charCount}`;
+        }
+
+        function saveSnapshot() {
+            const textarea = document.getElementById('mainText');
+            historyState = textarea.value;
+        }
+
+        function undoAction() {
+            const textarea = document.getElementById('mainText');
+            const currentText = textarea.value;
+            textarea.value = historyState;
+            historyState = currentText;
+            updateCounter(); 
+            textarea.focus();
+        }
+
+        function clearText() {
+            saveSnapshot(); 
+            const textarea = document.getElementById('mainText');
+            textarea.value = '';
+            
+            // Wipe the Find and Replace inputs as well
+            document.getElementById('findInput').value = '';
+            document.getElementById('replaceInput').value = '';
+
+            updateCounter(); 
+            textarea.focus();
+        }
+
+        function copyText() {
+            const textarea = document.getElementById('mainText');
+            const copyBtn = document.getElementById('copyBtn');
+            textarea.select();
+            document.execCommand('copy');
+            const originalText = copyBtn.innerText;
+            copyBtn.innerText = 'Copied!';
+            setTimeout(() => {
+                copyBtn.innerText = originalText;
+                window.getSelection().removeAllRanges();
+                textarea.focus();
+            }, 1500);
+        }
+
+        // --- FIND & REPLACE LOGIC ---
+        function escapeRegExp(string) {
+            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
+        }
+
+        function executeReplace() {
+            const findStr = document.getElementById('findInput').value;
+            const repStr = document.getElementById('replaceInput').value;
+            
+            if (!findStr) {
+                document.getElementById('mainText').focus();
+                return; 
+            }
+
+            saveSnapshot();
+            const textarea = document.getElementById('mainText');
+            const regex = new RegExp(escapeRegExp(findStr), 'gi');
+            textarea.value = textarea.value.replace(regex, repStr);
+            
+            updateCounter();
+            textarea.focus();
+        }
+
+        // --- FORMATTING LOGIC ---
+        function cleanText(text) {
+            return text.split('\n').map(line => line.trim().replace(/ +/g, ' ')).join('\n');
+        }
+
+        function processText(mode) {
+            saveSnapshot(); 
+            const textarea = document.getElementById('mainText');
+            let text = textarea.value;
+
+            if (appConfig.autoTrim || mode === 'trim') {
+                text = cleanText(text);
+            }
+
+            switch(mode) {
+                case 'trim':
+                    break;
+                case 'accents':
+                    text = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                    break;
+                case 'uppercase':
+                    text = text.toUpperCase();
+                    break;
+                case 'lowercase':
+                    text = text.toLowerCase();
+                    break;
+                case 'capitalized':
+                    text = text.split('\n').map(line => 
+                        line.split(' ').map(w => w.toLowerCase().replace(/[a-zà-ÿ]/i, c => c.toUpperCase())).join(' ')
+                    ).join('\n');
+                    break;
+                case 'sentence':
+                    text = text.toLowerCase().replace(/(^\s*|\.\s+|\!\s+|\?\s+)([a-zà-ÿ])/gi, (match, prefix, letter) => prefix + letter.toUpperCase());
+                    break;
+                case 'alternate':
+                    let firstLetterMatch = text.match(/[a-zà-ÿ]/i);
+                    let startUpper = true; 
+                    if (firstLetterMatch && firstLetterMatch[0] === firstLetterMatch[0].toUpperCase()) startUpper = false;
+
+                    let isUpper = startUpper;
+                    text = text.split('').map(c => {
+                        let current = c;
+                        if (/[a-zà-ÿ]/i.test(c)) {
+                            current = isUpper ? c.toUpperCase() : c.toLowerCase();
+                        }
+                        isUpper = !isUpper; 
+                        return current;
+                    }).join('');
+                    break;
+                case 'invert':
+                    text = text.split('').map(c => {
+                        if (/[a-zà-ÿ]/i.test(c)) return c === c.toUpperCase() ? c.toLowerCase() : c.toUpperCase();
+                        return c;
+                    }).join('');
+                    break;
+                case 'title':
+                    const dictItems = appConfig.dictionary.split(',').map(a => a.trim()).filter(a => a.length > 0);
+                    text = text.split('\n').map(line => 
+                        line.split(' ').map(w => {
+                            let cleanWord = w.replace(/[^a-zA-ZÀ-ÿ]/g, '').toUpperCase();
+                            let matchedDictItem = dictItems.find(item => item.replace(/[^a-zA-ZÀ-ÿ]/g, '').toUpperCase() === cleanWord);
+                            
+                            if (matchedDictItem && cleanWord.length > 0) {
+                                let prefix = w.match(/^[^a-zA-ZÀ-ÿ]*/)[0];
+                                let suffix = w.match(/[^a-zA-ZÀ-ÿ]*$/)[0];
+                                return prefix + matchedDictItem + suffix;
+                            } else {
+                                return w.toLowerCase().replace(/[a-zà-ÿ]/i, c => c.toUpperCase());
+                            }
+                        }).join(' ')
+                    ).join('\n');
+                    break;
+            }
+            
+            textarea.value = text;
+            updateCounter(); 
+            textarea.focus(); 
+        }
+    </script>
+</body>
+</html>
