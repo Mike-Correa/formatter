@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Text Formatter</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📝</text></svg>">
     <style>
         /* Base / Light Mode Variables */
         :root {
@@ -148,8 +149,10 @@
             right: 15px;
             font-size: 0.8em;
             color: #888;
-            background-color: transparent;
-            pointer-events: none; 
+            background-color: var(--input-bg);
+            padding: 2px 6px;
+            border-radius: 4px;
+            cursor: help; 
             user-select: none;
         }
 
@@ -162,16 +165,15 @@
 
         .utility-row {
             display: flex;
-            flex-wrap: nowrap; /* Forces everything on one line */
+            flex-wrap: nowrap; 
             gap: 10px;
             align-items: center;
         }
 
-        /* THE FIX: Decouple from width: 100% so they fit inline */
         .utility-row input[type="text"] {
             width: auto; 
             flex-grow: 1; 
-            min-width: 80px; /* Small enough to not break the line, flex-grow handles the rest */
+            min-width: 80px; 
             padding: 10px;
         }
 
@@ -242,15 +244,36 @@
             padding: 30px;
             border-radius: 10px;
             width: 90%;
-            max-width: 500px;
+            max-width: 700px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
             border: 1px solid var(--border-color);
         }
 
-        .modal-content h3 {
-            margin-top: 0;
-            color: var(--accent-color);
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 20px;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: var(--accent-color);
+        }
+
+        .close-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-color);
+            font-size: 1.8em;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+            transition: color 0.2s ease;
+        }
+
+        .close-btn:hover {
+            color: var(--danger-color);
         }
 
         .settings-group {
@@ -269,6 +292,7 @@
             height: 18px;
             cursor: pointer;
             accent-color: var(--accent-color);
+            flex-shrink: 0;
         }
 
         .checkbox-group label {
@@ -282,7 +306,10 @@
 
     <div id="settingsModal" class="modal-backdrop" onclick="handleBackdropClick(event)">
         <div class="modal-content">
-            <h3>Settings</h3>
+            <div class="modal-header">
+                <h3>Settings</h3>
+                <button class="close-btn" onclick="closeModalWithoutSaving()" title="Close without saving">&times;</button>
+            </div>
             
             <div class="settings-group">
                 <label for="dictConfig">Acronym Dictionary (Comma-separated)</label>
@@ -300,10 +327,16 @@
 
             <div class="checkbox-group">
                 <input type="checkbox" id="autoTrimConfig">
-                <label for="autoTrimConfig">Enable automatic space trimming on conversion</label>
+                <label for="autoTrimConfig">Enable automatic space and empty line trimming</label>
+            </div>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="accentAgnosticConfig">
+                <label for="accentAgnosticConfig">Make dictionary accent-agnostic (e.g., "À" formats according to "a")</label>
             </div>
             
-            <div style="text-align: right; margin-top: 25px;">
+            <div style="display: flex; justify-content: space-between; margin-top: 25px;">
+                <button class="header-btn clear-btn" style="padding: 10px 18px; font-size: 14px;" onclick="restoreDefaults()">Restore Defaults</button>
                 <button class="action-btn" onclick="closeAndSaveSettings()">Save & Close</button>
             </div>
         </div>
@@ -323,9 +356,9 @@
         <div class="form-group">
             <div class="textarea-wrapper">
                 <textarea id="mainText" rows="15" placeholder="Paste your text here..." autofocus></textarea>
-                <div id="textCounter" class="counter-display">0/0</div>
+                <div id="textCounter" class="counter-display" title="Lines / Words / Characters" onclick="document.getElementById('mainText').focus()">0/0/0</div>
             </div>
-            <div class="note">* Note: Automatic space trimming is active by default. Can be disabled in Settings.</div>
+            <div class="note">* Note: Automatic space and empty line trimming is active by default. Can be disabled in Settings.</div>
         </div>
 
         <div class="button-group">
@@ -353,11 +386,16 @@
         // --- STATE & CONFIG ---
         let historyState = "";
         
-        let appConfig = {
-            dictionary: "LTDA, EIRELI, EPP, MEI, ME, SA, S.A., da, das, do, dos, de",
+        // This object represents the absolute defaults
+        const defaultAppConfig = {
+            dictionary: "LTDA, EIRELI, EPP, MEI, ME, SA, S.A., SN, CEP, a, da, das, o, do, dos, e, de",
             theme: "system",
-            autoTrim: true
+            autoTrim: true,
+            accentAgnostic: true
         };
+
+        // Create a working copy for the app
+        let appConfig = { ...defaultAppConfig };
 
         // --- INITIALIZATION ---
         window.addEventListener('DOMContentLoaded', () => {
@@ -374,6 +412,7 @@
             document.getElementById('dictConfig').value = appConfig.dictionary;
             document.getElementById('themeSelect').value = appConfig.theme;
             document.getElementById('autoTrimConfig').checked = appConfig.autoTrim;
+            document.getElementById('accentAgnosticConfig').checked = appConfig.accentAgnostic;
 
             applyTheme(); 
             
@@ -406,6 +445,7 @@
             appConfig.dictionary = document.getElementById('dictConfig').value;
             appConfig.theme = document.getElementById('themeSelect').value;
             appConfig.autoTrim = document.getElementById('autoTrimConfig').checked;
+            appConfig.accentAgnostic = document.getElementById('accentAgnosticConfig').checked;
             
             localStorage.setItem('formatterConfig', JSON.stringify(appConfig));
             applyTheme(); 
@@ -413,8 +453,35 @@
             document.getElementById('mainText').focus(); 
         }
 
+        function closeModalWithoutSaving() {
+            document.getElementById('settingsModal').style.display = 'none';
+            
+            document.getElementById('dictConfig').value = appConfig.dictionary;
+            document.getElementById('themeSelect').value = appConfig.theme;
+            document.getElementById('autoTrimConfig').checked = appConfig.autoTrim;
+            document.getElementById('accentAgnosticConfig').checked = appConfig.accentAgnostic;
+            
+            applyTheme();
+            
+            document.getElementById('mainText').focus();
+        }
+
         function handleBackdropClick(event) {
             if (event.target.id === 'settingsModal') {
+                closeModalWithoutSaving();
+            }
+        }
+
+        function restoreDefaults() {
+            if (confirm("Are you sure you want to restore default settings? This will reset your custom dictionary and theme preferences.")) {
+                localStorage.removeItem('formatterConfig');
+                appConfig = { ...defaultAppConfig };
+                
+                document.getElementById('dictConfig').value = appConfig.dictionary;
+                document.getElementById('themeSelect').value = appConfig.theme;
+                document.getElementById('autoTrimConfig').checked = appConfig.autoTrim;
+                document.getElementById('accentAgnosticConfig').checked = appConfig.accentAgnostic;
+                
                 closeAndSaveSettings();
             }
         }
@@ -424,7 +491,8 @@
             const text = document.getElementById('mainText').value;
             const charCount = text.length;
             const wordCount = text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
-            document.getElementById('textCounter').innerText = `${wordCount}/${charCount}`;
+            const lineCount = text === '' ? 0 : text.split('\n').length;
+            document.getElementById('textCounter').innerText = `${lineCount}/${wordCount}/${charCount}`;
         }
 
         function saveSnapshot() {
@@ -446,7 +514,6 @@
             const textarea = document.getElementById('mainText');
             textarea.value = '';
             
-            // Wipe the Find and Replace inputs as well
             document.getElementById('findInput').value = '';
             document.getElementById('replaceInput').value = '';
 
@@ -493,8 +560,10 @@
 
         // --- FORMATTING LOGIC ---
         function cleanText(text) {
-            return text.split('\n').map(line => line.trim().replace(/ +/g, ' ')).join('\n');
+            return text.split('\n').map(line => line.trim().replace(/ +/g, ' ')).join('\n').trim();
         }
+
+        const removeAccents = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
         function processText(mode) {
             saveSnapshot(); 
@@ -523,7 +592,7 @@
                     ).join('\n');
                     break;
                 case 'sentence':
-                    text = text.toLowerCase().replace(/(^\s*|\.\s+|\!\s+|\?\s+)([a-zà-ÿ])/gi, (match, prefix, letter) => prefix + letter.toUpperCase());
+                    text = text.toLowerCase().replace(/(^\s*|\.\s+|\!\s+|\?\s+)([a-zà-ÿ])/gim, (match, prefix, letter) => prefix + letter.toUpperCase());
                     break;
                 case 'alternate':
                     let firstLetterMatch = text.match(/[a-zà-ÿ]/i);
@@ -548,18 +617,54 @@
                     break;
                 case 'title':
                     const dictItems = appConfig.dictionary.split(',').map(a => a.trim()).filter(a => a.length > 0);
+                    
                     text = text.split('\n').map(line => 
                         line.split(' ').map(w => {
-                            let cleanWord = w.replace(/[^a-zA-ZÀ-ÿ]/g, '').toUpperCase();
-                            let matchedDictItem = dictItems.find(item => item.replace(/[^a-zA-ZÀ-ÿ]/g, '').toUpperCase() === cleanWord);
-                            
-                            if (matchedDictItem && cleanWord.length > 0) {
-                                let prefix = w.match(/^[^a-zA-ZÀ-ÿ]*/)[0];
-                                let suffix = w.match(/[^a-zA-ZÀ-ÿ]*$/)[0];
-                                return prefix + matchedDictItem + suffix;
+                            let cleanWordOriginal = w.replace(/[^a-zA-ZÀ-ÿ]/g, '');
+                            let cleanWordUpper = cleanWordOriginal.toUpperCase();
+                            let matchedDictItem;
+
+                            if (appConfig.accentAgnostic) {
+                                let cleanWordBase = removeAccents(cleanWordUpper);
+                                matchedDictItem = dictItems.find(item => 
+                                    removeAccents(item.replace(/[^a-zA-ZÀ-ÿ]/g, '')).toUpperCase() === cleanWordBase
+                                );
+
+                                if (matchedDictItem && cleanWordBase.length > 0) {
+                                    let prefix = w.match(/^[^a-zA-ZÀ-ÿ]*/)[0];
+                                    let suffix = w.match(/[^a-zA-ZÀ-ÿ]*$/)[0];
+                                    
+                                    let formattedWord = '';
+                                    let origLettersArray = cleanWordOriginal.split('');
+                                    
+                                    for (let i = 0; i < matchedDictItem.length; i++) {
+                                        let dChar = matchedDictItem[i];
+                                        if (/[a-zA-ZÀ-ÿ]/.test(dChar)) {
+                                            let oChar = origLettersArray.shift() || dChar;
+                                            if (dChar === dChar.toUpperCase()) {
+                                                formattedWord += oChar.toUpperCase();
+                                            } else {
+                                                formattedWord += oChar.toLowerCase();
+                                            }
+                                        } else {
+                                            formattedWord += dChar;
+                                        }
+                                    }
+                                    formattedWord += origLettersArray.join('');
+                                    return prefix + formattedWord + suffix;
+                                }
                             } else {
-                                return w.toLowerCase().replace(/[a-zà-ÿ]/i, c => c.toUpperCase());
+                                matchedDictItem = dictItems.find(item => item.replace(/[^a-zA-ZÀ-ÿ]/g, '').toUpperCase() === cleanWordUpper);
+                                
+                                if (matchedDictItem && cleanWordUpper.length > 0) {
+                                    let prefix = w.match(/^[^a-zA-ZÀ-ÿ]*/)[0];
+                                    let suffix = w.match(/[^a-zA-ZÀ-ÿ]*$/)[0];
+                                    return prefix + matchedDictItem + suffix;
+                                }
                             }
+                            
+                            return w.toLowerCase().replace(/[a-zà-ÿ]/i, c => c.toUpperCase());
+                            
                         }).join(' ')
                     ).join('\n');
                     break;
